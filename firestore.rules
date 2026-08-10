@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Disponibilités : lecture publique, écriture admin connecté
+    match /settings/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Galerie : lecture publique, écriture admin
+    match /gallery/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Réservations : un client peut CRÉER une résa (formulaire public).
+    // Lecture publique nécessaire pour afficher les créneaux déjà pris
+    // (anti double-booking). ⚠️ Cela expose les données du formulaire.
+    // Pour de la vraie prod : passer par une Cloud Function qui n'expose
+    // que les numéros de créneaux, sans nom ni téléphone.
+    match /bookings/{doc} {
+      allow create: if
+        request.resource.data.name is string &&
+        request.resource.data.phone is string &&
+        request.resource.data.date is string &&
+        request.resource.data.slot is int;
+      allow read: if true;
+      allow update, delete: if request.auth != null;
+    }
+  }
+}
