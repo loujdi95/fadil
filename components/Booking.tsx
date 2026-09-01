@@ -9,6 +9,8 @@ import {
   WEEKDAYS,
   PRESTATIONS,
   AFTER_HOUR_SURCHARGE,
+  prestationSpan,
+  occupiedSlots,
   type Slot,
   type Booking as BookingType,
 } from "@/lib/booking";
@@ -22,7 +24,7 @@ import {
   type Availability,
   type Blocks,
 } from "@/lib/store";
-import { notifyNewBooking } from "@/lib/notify";
+import { notifyNewBooking, notifyClientReceived } from "@/lib/notify";
 import { ArrowIcon } from "./icons";
 
 const MONTHS = [
@@ -43,8 +45,8 @@ export default function Booking() {
   const [slot, setSlot] = useState<Slot | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  const [form, setForm] = useState<{ name: string; phone: string; prestation: string; note: string }>(
-    { name: "", phone: "", prestation: PRESTATIONS[0], note: "" },
+  const [form, setForm] = useState<{ name: string; phone: string; email: string; prestation: string; note: string }>(
+    { name: "", phone: "", email: "", prestation: PRESTATIONS[0], note: "" },
   );
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -74,6 +76,36 @@ export default function Booking() {
     () => generateSlots(avail.open, avail.close),
     [avail.open, avail.close],
   );
+  const slotValues = useMemo(() => new Set(slots.map((s) => s.value)), [slots]);
+
+  const span = prestationSpan(form.prestation);
+
+  // le créneau choisi doit rester valide quand on change de prestation
+  useEffect(() => {
+    setSlot(null);
+  }, [form.prestation]);
+
+  const todayKey = dateKey(new Date());
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+
+  /** Le créneau `s` peut-il servir de DÉBUT pour la prestation choisie ? */
+  function startAvailable(s: Slot): boolean {
+    if (!selected) return false;
+    const req = occupiedSlots(s.value, span);
+    if (!req.every((m) => slotValues.has(m))) return false; // durée dépasse / tombe sur la pause
+    const off = blocks.offSlots[dateKey(selected)] ?? [];
+    if (req.some((m) => taken.has(m) || off.includes(m))) return false;
+    if (dateKey(selected) === todayKey && s.value <= nowMinutes) return false; // déjà passé
+    return true;
+  }
+
+  /** Créneaux affichés : on masque ceux déjà passés le jour même. */
+  const visibleSlots = useMemo(() => {
+    if (selected && dateKey(selected) === todayKey) {
+      return slots.filter((s) => s.value > nowMinutes);
+    }
+    return slots;
+  }, [slots, selected, todayKey, nowMinutes]);
 
   async function pickDay(d: Date) {
     setSelected(d);
@@ -82,7 +114,8 @@ export default function Booking() {
     setLoadingSlots(true);
     try {
       const b = await getBookingsForDate(dateKey(d));
-      setTaken(new Set(b.map((x) => x.slot)));
+      const occupied = b.flatMap((x) => occupiedSlots(x.slot, x.span ?? 1));
+      setTaken(new Set(occupied));
     } catch {
       setTaken(new Set());
     } finally {
@@ -109,7 +142,9 @@ export default function Booking() {
       slotLabel: slot.label,
       name: form.name.trim(),
       phone: form.phone.trim(),
+      email: form.email.trim() || undefined,
       prestation: form.prestation,
+      span,
       afterHour: slot.afterHour,
       note: form.note.trim() || undefined,
     };
@@ -124,6 +159,7 @@ export default function Booking() {
         cancelUrl: `${base}/cancel?${q}`,
         adminUrl: `${origin}/admin`,
       });
+      notifyClientReceived(booking); // e-mail au client (si email fourni + configuré)
       setStatus("done");
     } else {
       setStatus("error");
@@ -155,7 +191,7 @@ export default function Booking() {
               setStatus("idle");
               setSlot(null);
               setSelected(null);
-              setForm({ name: "", phone: "", prestation: PRESTATIONS[0], note: "" });
+              setForm({ name: "", phone: "", email: "", prestation: PRESTATIONS[0], note: "" });
             }}
             className="mt-8 rounded-full border border-ink/20 px-6 py-3 text-sm font-semibold transition hover:border-ink"
           >
@@ -245,9 +281,13 @@ export default function Booking() {
             )}
             {selected && !loadingSlots && (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {slots.map((s) => {
-                  const offForDay = selected ? blocks.offSlots[dateKey(selected)] ?? [] : [];
-                  const isTaken = taken.has(s.value) || offForDay.includes(s.value);
+                {visibleSlots.length === 0 && (
+                  <p className="col-span-full py-4 text-center text-sm text-ink/50">
+                    Plus de créneau disponible ce jour.
+                  </p>
+                )}
+                {visibleSlots.map((s) => {
+                  const isTaken = !startAvailable(s);
                   const isSel = slot?.value === s.value;
                   return (
                     <button
@@ -304,6 +344,15 @@ export default function Booking() {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="06 12 34 56 78"
+                className="input"
+              />
+            </Field>
+            <Field label="E-mail (pour la confirmation)">
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="ton@email.com"
                 className="input"
               />
             </Field>

@@ -64,6 +64,24 @@ export const PRESTATIONS = [
   "Contours / Finitions",
 ] as const;
 
+/** Nombre de créneaux de 40 min occupés par prestation. */
+export const PRESTATION_SLOTS: Record<string, number> = {
+  "Coupe": 1,
+  "Coupe + Barbe": 2, // 80 min
+  "Barbe": 1,
+  "Coupe enfant": 1,
+  "Contours / Finitions": 1,
+};
+
+export function prestationSpan(p: string): number {
+  return PRESTATION_SLOTS[p] ?? 1;
+}
+
+/** Minutes de début occupées par un RDV : [start, start+40, …] */
+export function occupiedSlots(start: number, span: number): number[] {
+  return Array.from({ length: Math.max(1, span) }, (_, i) => start + i * SLOT_MINUTES);
+}
+
 export type BookingStatus = "pending" | "confirmed";
 
 export type Booking = {
@@ -73,7 +91,9 @@ export type Booking = {
   slotLabel: string;
   name: string;
   phone: string;
+  email?: string;
   prestation: string;
+  span?: number; // nb de créneaux occupés (défaut 1)
   afterHour: boolean;
   note?: string;
   status?: BookingStatus; // "pending" par défaut (à valider par le coiffeur)

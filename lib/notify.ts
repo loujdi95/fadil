@@ -19,10 +19,43 @@ import type { Booking } from "./booking";
    =========================================================== */
 
 const SERVICE = process.env.NEXT_PUBLIC_EMAILJS_SERVICE;
-const TEMPLATE = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE;
+const TEMPLATE = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE; // -> coiffeur (nouvelle résa)
+const TEMPLATE_CLIENT = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_CLIENT; // -> client (reçu)
+const TEMPLATE_CONFIRMED = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_CONFIRMED; // -> client (confirmé)
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY;
 
 export const emailNotifyReady = Boolean(SERVICE && TEMPLATE && PUBLIC_KEY);
+
+function clientParams(b: Booking) {
+  return {
+    to_email: b.email || "",
+    name: b.name,
+    prestation: b.prestation,
+    date: b.date,
+    slot: b.slotLabel,
+    after_hour: b.afterHour ? "Oui (+5)" : "Non",
+  };
+}
+
+/** E-mail au CLIENT : « demande bien reçue ». */
+export async function notifyClientReceived(b: Booking): Promise<void> {
+  if (!SERVICE || !PUBLIC_KEY || !TEMPLATE_CLIENT || !b.email) return;
+  try {
+    await emailjs.send(SERVICE, TEMPLATE_CLIENT, clientParams(b), { publicKey: PUBLIC_KEY });
+  } catch (e) {
+    console.warn("E-mail client (reçu) non envoyé :", e);
+  }
+}
+
+/** E-mail au CLIENT : « RDV confirmé ». */
+export async function notifyClientConfirmed(b: Booking): Promise<void> {
+  if (!SERVICE || !PUBLIC_KEY || !TEMPLATE_CONFIRMED || !b.email) return;
+  try {
+    await emailjs.send(SERVICE, TEMPLATE_CONFIRMED, clientParams(b), { publicKey: PUBLIC_KEY });
+  } catch (e) {
+    console.warn("E-mail client (confirmé) non envoyé :", e);
+  }
+}
 
 type Links = { confirmUrl?: string; cancelUrl?: string; adminUrl?: string };
 
@@ -36,6 +69,7 @@ export async function notifyNewBooking(b: Booking, links: Links = {}): Promise<v
       {
         name: b.name,
         phone: b.phone,
+        email: b.email || "—",
         prestation: b.prestation,
         date: b.date,
         slot: b.slotLabel,

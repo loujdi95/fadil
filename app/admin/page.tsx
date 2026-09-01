@@ -21,6 +21,7 @@ import {
   type GalleryItem,
 } from "@/lib/store";
 import { uploadGalleryImage } from "@/lib/gallery-upload";
+import { notifyClientConfirmed } from "@/lib/notify";
 import {
   WEEKDAYS,
   fmt,
@@ -244,7 +245,13 @@ function BookingsTab() {
               <div className="flex items-center gap-2">
                 {st === "pending" && (
                   <button
-                    onClick={async () => { if (b.id) { await setBookingStatus(b.id, "confirmed"); load(); } }}
+                    onClick={async () => {
+                      if (b.id) {
+                        await setBookingStatus(b.id, "confirmed");
+                        notifyClientConfirmed(b); // e-mail au client
+                        load();
+                      }
+                    }}
                     className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-cream transition hover:bg-violet"
                   >
                     Confirmer

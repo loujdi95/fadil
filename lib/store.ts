@@ -13,7 +13,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import type { Booking, BookingStatus } from "./booking";
+import { occupiedSlots, type Booking, type BookingStatus } from "./booking";
 
 /* ===========================================================
    Couche données : Firebase si configuré, sinon localStorage
@@ -128,9 +128,14 @@ export async function getAllBookings(): Promise<Booking[]> {
 export async function createBooking(
   b: Booking,
 ): Promise<{ ok: boolean; reason?: string; id?: string; token?: string }> {
-  // anti double-booking
+  // anti double-booking (avec durée : chevauchement de créneaux)
   const existing = await getBookingsForDate(b.date);
-  if (existing.some((e) => e.slot === b.slot)) {
+  const wanted = occupiedSlots(b.slot, b.span ?? 1);
+  const clash = existing.some((e) => {
+    const occ = occupiedSlots(e.slot, e.span ?? 1);
+    return occ.some((m) => wanted.includes(m));
+  });
+  if (clash) {
     return { ok: false, reason: "Ce créneau vient d'être pris." };
   }
   // statut "pending" : le créneau est bloqué mais le coiffeur doit valider
