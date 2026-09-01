@@ -6,17 +6,30 @@ import { signIn, signOut, watchAuth, DEMO_PASSCODE } from "@/lib/auth";
 import {
   getAvailability,
   saveAvailability,
+  getBlocks,
+  saveBlocks,
   getAllBookings,
+  getBookingsForDate,
   deleteBooking,
   setBookingStatus,
   getGallery,
   removeGalleryItem,
   DEFAULT_AVAILABILITY,
+  DEFAULT_BLOCKS,
   type Availability,
+  type Blocks,
   type GalleryItem,
 } from "@/lib/store";
 import { uploadGalleryImage } from "@/lib/gallery-upload";
-import { WEEKDAYS, fmt, type Booking } from "@/lib/booking";
+import {
+  WEEKDAYS,
+  fmt,
+  generateSlots,
+  dateKey,
+  weekdayIndex,
+  startOfWeek,
+  type Booking,
+} from "@/lib/booking";
 
 export default function AdminPage() {
   const [ready, setReady] = useState(false);
@@ -254,75 +267,238 @@ function BookingsTab() {
 
 /* -------------------- Onglet Disponibilités -------------------- */
 
+const MONTHS_SHORT = ["janv", "févr", "mars", "avr", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
+
 function AvailabilityTab() {
   const [a, setA] = useState<Availability | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [blocks, setBlocks] = useState<Blocks | null>(null);
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [selected, setSelected] = useState<Date | null>(null);
+  const [dayBookings, setDayBookings] = useState<Set<number>>(new Set());
+  const [toast, setToast] = useState(false);
+  const [showAdv, setShowAdv] = useState(false);
 
-  useEffect(() => { getAvailability().then(setA).catch(() => setA(DEFAULT_AVAILABILITY)); }, []);
+  useEffect(() => {
+    getAvailability().then(setA).catch(() => setA(DEFAULT_AVAILABILITY));
+    getBlocks().then(setBlocks).catch(() => setBlocks(DEFAULT_BLOCKS));
+  }, []);
 
-  if (!a) return <p className="text-ink/40">Chargement…</p>;
+  useEffect(() => {
+    if (!selected) return;
+    getBookingsForDate(dateKey(selected))
+      .then((b) => setDayBookings(new Set(b.map((x) => x.slot))))
+      .catch(() => setDayBookings(new Set()));
+  }, [selected]);
 
-  const save = async () => {
+  if (!a || !blocks) return <p className="text-ink/40">Chargement…</p>;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const slots = generateSlots(a.open, a.close);
+  const canPrev = weekStart > startOfWeek(today);
+
+  const ping = () => {
+    setToast(true);
+    setTimeout(() => setToast(false), 1500);
+  };
+
+  const persist = async (nextBlocks: Blocks) => {
+    setBlocks(nextBlocks);
+    await saveBlocks(nextBlocks);
+    ping();
+  };
+
+  const toggleDayOff = (d: Date) => {
+    const k = dateKey(d);
+    const off = blocks.offDays.includes(k);
+    const nextOff = off ? blocks.offDays.filter((x) => x !== k) : [...blocks.offDays, k];
+    if (!off && selected && dateKey(selected) === k) setSelected(null);
+    persist({ ...blocks, offDays: nextOff });
+  };
+
+  const toggleSlot = (d: Date, slot: number) => {
+    const k = dateKey(d);
+    const cur = blocks.offSlots[k] ?? [];
+    const next = cur.includes(slot) ? cur.filter((s) => s !== slot) : [...cur, slot];
+    const offSlots = { ...blocks.offSlots };
+    if (next.length) offSlots[k] = next;
+    else delete offSlots[k];
+    persist({ ...blocks, offSlots });
+  };
+
+  const saveAdv = async () => {
     await saveAvailability(a);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    ping();
   };
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-bold">Disponibilités</h1>
-      <p className="mt-1 text-sm text-ink/50">Coche les jours où tu ouvres. Les autres sont bloqués.</p>
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-3xl font-bold">Ton planning</h1>
+        {toast && <span className="text-sm font-semibold text-violet">Enregistré ✓</span>}
+      </div>
+      <p className="mt-1 text-sm text-ink/50">
+        Tu es <strong>dispo par défaut</strong>. Mets un jour <strong>OFF</strong>, ou clique
+        un jour pour bloquer des créneaux précis.
+      </p>
 
-      <div className="mt-8 grid gap-3 sm:grid-cols-2">
-        {WEEKDAYS.map((day, i) => (
-          <button
-            key={day}
-            onClick={() => {
-              const next = [...a.openDays];
-              next[i] = !next[i];
-              setA({ ...a, openDays: next });
-            }}
-            className={`flex items-center justify-between rounded-2xl border p-4 text-left transition ${
-              a.openDays[i] ? "border-violet bg-violet/10" : "border-line bg-white/40"
-            }`}
-          >
-            <span className="font-semibold">{day}</span>
-            <span className={`text-sm font-semibold ${a.openDays[i] ? "text-violet" : "text-ink/40"}`}>
-              {a.openDays[i] ? "Ouvert" : "Fermé"}
-            </span>
-          </button>
-        ))}
+      {/* Navigation semaine */}
+      <div className="mt-8 flex items-center justify-between">
+        <button
+          onClick={() => canPrev && setWeekStart((w) => { const n = new Date(w); n.setDate(n.getDate() - 7); return n; })}
+          disabled={!canPrev}
+          className="rounded-full border border-ink/15 px-4 py-2 text-sm font-semibold transition enabled:hover:border-ink disabled:opacity-30"
+        >
+          ← Semaine préc.
+        </button>
+        <div className="text-sm font-semibold">
+          {days[0].getDate()} {MONTHS_SHORT[days[0].getMonth()]} — {days[6].getDate()} {MONTHS_SHORT[days[6].getMonth()]}
+        </div>
+        <button
+          onClick={() => setWeekStart((w) => { const n = new Date(w); n.setDate(n.getDate() + 7); return n; })}
+          className="rounded-full border border-ink/15 px-4 py-2 text-sm font-semibold transition hover:border-ink"
+        >
+          Semaine suiv. →
+        </button>
       </div>
 
-      <div className="mt-8 grid max-w-md gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-semibold uppercase text-ink/50">Ouverture</span>
-          <select
-            value={a.open}
-            onChange={(e) => setA({ ...a, open: Number(e.target.value) })}
-            className="admin-input"
-          >
-            {hoursRange(7, 14).map((m) => (<option key={m} value={m}>{fmt(m)}</option>))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-semibold uppercase text-ink/50">Fermeture</span>
-          <select
-            value={a.close}
-            onChange={(e) => setA({ ...a, close: Number(e.target.value) })}
-            className="admin-input"
-          >
-            {hoursRange(18, 24).map((m) => (<option key={m} value={m}>{fmt(m)}</option>))}
-          </select>
-        </label>
+      {/* Grille des 7 jours */}
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {days.map((d) => {
+          const k = dateKey(d);
+          const past = d < today;
+          const off = blocks.offDays.includes(k);
+          const blockedCount = (blocks.offSlots[k] ?? []).length;
+          const isSel = selected && dateKey(selected) === k;
+          return (
+            <div
+              key={k}
+              className={`rounded-2xl border p-4 transition ${
+                past
+                  ? "border-line bg-ink/[0.02] opacity-50"
+                  : off
+                    ? "border-red-300 bg-red-50"
+                    : isSel
+                      ? "border-violet bg-violet/10"
+                      : "border-line bg-white/50"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-ink/50">
+                    {WEEKDAYS[weekdayIndex(d)].slice(0, 3)}
+                  </div>
+                  <div className="font-display text-lg font-bold">
+                    {d.getDate()} {MONTHS_SHORT[d.getMonth()]}
+                  </div>
+                </div>
+                {!past && (
+                  <button
+                    onClick={() => toggleDayOff(d)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                      off ? "bg-red-500 text-white" : "bg-ink/[0.06] text-ink/60 hover:bg-ink/10"
+                    }`}
+                  >
+                    {off ? "OFF" : "Dispo"}
+                  </button>
+                )}
+              </div>
+
+              {!past && !off && (
+                <button
+                  onClick={() => setSelected(isSel ? null : d)}
+                  className="mt-3 w-full rounded-xl border border-ink/10 py-2 text-xs font-semibold text-ink/60 transition hover:border-ink/30"
+                >
+                  {isSel ? "Fermer" : blockedCount ? `Créneaux · ${blockedCount} bloqué${blockedCount > 1 ? "s" : ""}` : "Gérer les créneaux"}
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
+      {/* Créneaux du jour sélectionné */}
+      {selected && !blocks.offDays.includes(dateKey(selected)) && (
+        <div className="mt-6 rounded-2xl border border-violet/30 bg-white/50 p-5">
+          <div className="text-sm font-semibold">
+            Créneaux du {selected.getDate()} {MONTHS_SHORT[selected.getMonth()]}
+          </div>
+          <p className="mt-1 text-xs text-ink/50">
+            Clique pour bloquer/débloquer. Les créneaux déjà réservés sont marqués.
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {slots.map((s) => {
+              const booked = dayBookings.has(s.value);
+              const blocked = (blocks.offSlots[dateKey(selected)] ?? []).includes(s.value);
+              return (
+                <button
+                  key={s.value}
+                  disabled={booked}
+                  onClick={() => toggleSlot(selected, s.value)}
+                  className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
+                    booked
+                      ? "cursor-not-allowed border-green-300 bg-green-50 text-green-700"
+                      : blocked
+                        ? "border-red-300 bg-red-50 text-red-600 line-through"
+                        : "border-ink/15 hover:border-ink"
+                  }`}
+                >
+                  {s.label}
+                  {booked && <span className="block text-[9px] font-normal">réservé</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Réglages avancés */}
       <button
-        onClick={save}
-        className="mt-8 rounded-full bg-ink px-6 py-3 font-semibold text-cream transition hover:bg-violet"
+        onClick={() => setShowAdv((v) => !v)}
+        className="mt-8 text-sm font-semibold text-ink/50 hover:text-ink"
       >
-        {saved ? "Enregistré ✓" : "Enregistrer"}
+        {showAdv ? "▾" : "▸"} Réglages avancés (horaires & jours de fermeture fixes)
       </button>
+      {showAdv && (
+        <div className="mt-4 rounded-2xl border border-line bg-white/40 p-5">
+          <div className="text-xs font-semibold uppercase text-ink/50">Jours de fermeture habituels</div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-4">
+            {WEEKDAYS.map((day, i) => (
+              <button
+                key={day}
+                onClick={() => setA({ ...a, openDays: a.openDays.map((v, j) => (j === i ? !v : v)) })}
+                className={`rounded-xl border p-3 text-sm font-semibold transition ${
+                  a.openDays[i] ? "border-line bg-white/50" : "border-red-300 bg-red-50 text-red-600"
+                }`}
+              >
+                {day.slice(0, 3)} · {a.openDays[i] ? "ouvert" : "fermé"}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 grid max-w-md gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase text-ink/50">Ouverture</span>
+              <select value={a.open} onChange={(e) => setA({ ...a, open: Number(e.target.value) })} className="admin-input">
+                {hoursRange(7, 14).map((m) => (<option key={m} value={m}>{fmt(m)}</option>))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase text-ink/50">Fermeture</span>
+              <select value={a.close} onChange={(e) => setA({ ...a, close: Number(e.target.value) })} className="admin-input">
+                {hoursRange(18, 24).map((m) => (<option key={m} value={m}>{fmt(m)}</option>))}
+              </select>
+            </label>
+          </div>
+          <button onClick={saveAdv} className="mt-5 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-cream transition hover:bg-violet">
+            Enregistrer les réglages
+          </button>
+        </div>
+      )}
 
       <style jsx global>{`
         .admin-input {

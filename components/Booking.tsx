@@ -14,10 +14,13 @@ import {
 } from "@/lib/booking";
 import {
   getAvailability,
+  getBlocks,
   getBookingsForDate,
   createBooking,
   DEFAULT_AVAILABILITY,
+  DEFAULT_BLOCKS,
   type Availability,
+  type Blocks,
 } from "@/lib/store";
 import { notifyNewBooking } from "@/lib/notify";
 import { ArrowIcon } from "./icons";
@@ -33,6 +36,7 @@ function labelDate(d: Date) {
 
 export default function Booking() {
   const [avail, setAvail] = useState<Availability>(DEFAULT_AVAILABILITY);
+  const [blocks, setBlocks] = useState<Blocks>(DEFAULT_BLOCKS);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selected, setSelected] = useState<Date | null>(null);
   const [taken, setTaken] = useState<Set<number>>(new Set());
@@ -47,6 +51,7 @@ export default function Booking() {
 
   useEffect(() => {
     getAvailability().then(setAvail).catch(() => setAvail(DEFAULT_AVAILABILITY));
+    getBlocks().then(setBlocks).catch(() => setBlocks(DEFAULT_BLOCKS));
   }, []);
 
   const days = useMemo(
@@ -86,7 +91,11 @@ export default function Booking() {
   }
 
   function isOpen(d: Date) {
-    return avail.openDays[weekdayIndex(d)] && d >= today;
+    return (
+      avail.openDays[weekdayIndex(d)] &&
+      d >= today &&
+      !blocks.offDays.includes(dateKey(d))
+    );
   }
 
   async function submit(e: React.FormEvent) {
@@ -106,7 +115,15 @@ export default function Booking() {
     };
     const res = await createBooking(booking);
     if (res.ok) {
-      notifyNewBooking(booking); // e-mail au coiffeur (si configuré)
+      // e-mail au coiffeur avec liens Valider / Annuler (si configuré)
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const base = `${origin}/api/booking`;
+      const q = `id=${res.id}&token=${res.token}`;
+      notifyNewBooking(booking, {
+        confirmUrl: `${base}/confirm?${q}`,
+        cancelUrl: `${base}/cancel?${q}`,
+        adminUrl: `${origin}/admin`,
+      });
       setStatus("done");
     } else {
       setStatus("error");
@@ -229,7 +246,8 @@ export default function Booking() {
             {selected && !loadingSlots && (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {slots.map((s) => {
-                  const isTaken = taken.has(s.value);
+                  const offForDay = selected ? blocks.offSlots[dateKey(selected)] ?? [] : [];
+                  const isTaken = taken.has(s.value) || offForDay.includes(s.value);
                   const isSel = slot?.value === s.value;
                   return (
                     <button

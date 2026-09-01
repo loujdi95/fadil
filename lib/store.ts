@@ -28,15 +28,25 @@ export type Availability = {
 };
 
 export const DEFAULT_AVAILABILITY: Availability = {
-  openDays: [true, true, true, true, true, true, false], // fermé dimanche
+  openDays: [true, true, true, true, true, true, true], // full dispo par défaut
   open: 10 * 60,
   close: 22 * 60,
 };
 
 export type GalleryItem = { id: string; url: string; caption?: string; permalink?: string };
 
+/* Blocages ponctuels posés semaine par semaine par le coiffeur.
+   Par défaut : rien de bloqué = full dispo. */
+export type Blocks = {
+  offDays: string[];                    // jours OFF, ex ["2026-08-14"]
+  offSlots: Record<string, number[]>;   // créneaux bloqués par jour, ex { "2026-08-12": [600, 640] }
+};
+
+export const DEFAULT_BLOCKS: Blocks = { offDays: [], offSlots: {} };
+
 const LS = {
   avail: "fd7_availability",
+  blocks: "fd7_blocks",
   bookings: "fd7_bookings",
   gallery: "fd7_gallery",
 };
@@ -73,6 +83,25 @@ export async function saveAvailability(a: Availability): Promise<void> {
   lsSet(LS.avail, a);
 }
 
+/* -------------------- Blocages (jours off / créneaux) -------------------- */
+
+export async function getBlocks(): Promise<Blocks> {
+  if (isFirebaseReady && db) {
+    const snap = await getDoc(doc(db, "settings", "blocks"));
+    if (snap.exists()) return { ...DEFAULT_BLOCKS, ...(snap.data() as Blocks) };
+    return DEFAULT_BLOCKS;
+  }
+  return lsGet(LS.blocks, DEFAULT_BLOCKS);
+}
+
+export async function saveBlocks(b: Blocks): Promise<void> {
+  if (isFirebaseReady && db) {
+    await setDoc(doc(db, "settings", "blocks"), b);
+    return;
+  }
+  lsSet(LS.blocks, b);
+}
+
 /* -------------------- Réservations -------------------- */
 
 export async function getBookingsForDate(date: string): Promise<Booking[]> {
@@ -96,22 +125,26 @@ export async function getAllBookings(): Promise<Booking[]> {
   );
 }
 
-export async function createBooking(b: Booking): Promise<{ ok: boolean; reason?: string }> {
+export async function createBooking(
+  b: Booking,
+): Promise<{ ok: boolean; reason?: string; id?: string; token?: string }> {
   // anti double-booking
   const existing = await getBookingsForDate(b.date);
   if (existing.some((e) => e.slot === b.slot)) {
     return { ok: false, reason: "Ce créneau vient d'être pris." };
   }
   // statut "pending" : le créneau est bloqué mais le coiffeur doit valider
-  const payload: Booking = { ...b, status: b.status ?? "pending", createdAt: Date.now() };
+  const token = b.token ?? crypto.randomUUID().replace(/-/g, "");
+  const payload: Booking = { ...b, status: b.status ?? "pending", token, createdAt: Date.now() };
   if (isFirebaseReady && db) {
-    await addDoc(collection(db, "bookings"), payload);
-    return { ok: true };
+    const ref = await addDoc(collection(db, "bookings"), payload);
+    return { ok: true, id: ref.id, token };
   }
+  const id = crypto.randomUUID();
   const all = lsGet<Booking[]>(LS.bookings, []);
-  all.push({ ...payload, id: crypto.randomUUID() });
+  all.push({ ...payload, id });
   lsSet(LS.bookings, all);
-  return { ok: true };
+  return { ok: true, id, token };
 }
 
 export async function setBookingStatus(id: string, status: BookingStatus): Promise<void> {

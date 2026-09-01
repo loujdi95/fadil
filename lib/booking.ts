@@ -77,6 +77,7 @@ export type Booking = {
   afterHour: boolean;
   note?: string;
   status?: BookingStatus; // "pending" par défaut (à valider par le coiffeur)
+  token?: string;         // jeton secret pour valider/annuler depuis l'e-mail
   createdAt?: number;
 };
 

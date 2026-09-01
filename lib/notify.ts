@@ -24,8 +24,10 @@ const PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY;
 
 export const emailNotifyReady = Boolean(SERVICE && TEMPLATE && PUBLIC_KEY);
 
+type Links = { confirmUrl?: string; cancelUrl?: string; adminUrl?: string };
+
 /** Envoie l'e-mail de notification. Ne bloque jamais la réservation en cas d'échec. */
-export async function notifyNewBooking(b: Booking): Promise<void> {
+export async function notifyNewBooking(b: Booking, links: Links = {}): Promise<void> {
   if (!emailNotifyReady) return;
   try {
     await emailjs.send(
@@ -39,6 +41,9 @@ export async function notifyNewBooking(b: Booking): Promise<void> {
         slot: b.slotLabel,
         note: b.note || "—",
         after_hour: b.afterHour ? "Oui (+5)" : "Non",
+        confirm_url: links.confirmUrl || "",
+        cancel_url: links.cancelUrl || "",
+        admin_url: links.adminUrl || "",
       },
       { publicKey: PUBLIC_KEY! },
     );
