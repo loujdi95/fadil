@@ -75,29 +75,6 @@ export default function Hero() {
           </div>
         </div>
       </div>
-
-      {/* Bande prestations — noire, prolonge la vidéo */}
-      <div className="bg-ink text-cream">
-        <div className="mx-auto max-w-6xl px-5">
-          <ul className="grid grid-cols-2 divide-cream/10 sm:grid-cols-3 md:grid-cols-6 md:divide-x">
-            {["Coupe", "Barbe", "Dégradé", "Contours", "Finitions", "Enfant"].map(
-              (w, i) => (
-                <li
-                  key={w}
-                  className="flex items-center gap-3 border-b border-cream/10 py-6 md:justify-center md:border-b-0"
-                >
-                  <span className="font-display text-xs font-bold text-violet-bright">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="text-sm font-semibold uppercase tracking-wider">
-                    {w}
-                  </span>
-                </li>
-              ),
-            )}
-          </ul>
-        </div>
-      </div>
     </section>
   );
 }
