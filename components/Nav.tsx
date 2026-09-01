@@ -26,9 +26,13 @@ export default function Nav() {
           scrolled ? "text-ink" : "text-cream"
         }`}
       >
-        <a href="#top" className="font-display text-lg font-extrabold tracking-tight">
-          {SITE.name}
-          <span className={scrolled ? "text-violet" : "text-violet-bright"}>.</span>
+        <a href="#top" className="flex items-center" aria-label={SITE.name}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={scrolled ? "/logo/logo-dark.png" : "/logo/logo-light.png"}
+            alt={SITE.name}
+            className="h-8 w-auto md:h-9"
+          />
         </a>
 
         <div className="hidden items-center gap-8 text-sm font-medium md:flex">

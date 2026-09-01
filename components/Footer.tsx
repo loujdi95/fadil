@@ -6,11 +6,9 @@ export default function Footer() {
     <footer className="mt-auto border-t border-line bg-ink text-cream">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-14 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="font-display text-3xl font-extrabold">
-            {SITE.name}
-            <span className="text-violet">.</span>
-          </div>
-          <p className="mt-3 max-w-xs text-sm text-cream/60">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo/logo-light.png" alt={SITE.name} className="h-10 w-auto" />
+          <p className="mt-4 max-w-xs text-sm text-cream/60">
             Barbershop sur rendez-vous. Coupe · Barbe · Finitions.
           </p>
         </div>
