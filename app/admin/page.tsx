@@ -114,7 +114,7 @@ function Login({ onDone }: { onDone: () => void }) {
 /* -------------------- Dashboard -------------------- */
 
 function Dashboard() {
-  const [tab, setTab] = useState<"resa" | "dispo" | "galerie">("resa");
+  const [tab, setTab] = useState<"resa" | "dispo" | "galerie" | "agenda">("resa");
 
   return (
     <div className="min-h-screen">
@@ -138,6 +138,7 @@ function Dashboard() {
             ["resa", "Réservations"],
             ["dispo", "Disponibilités"],
             ["galerie", "Galerie"],
+            ["agenda", "Agenda"],
           ] as const).map(([k, label]) => (
             <button
               key={k}
@@ -156,6 +157,7 @@ function Dashboard() {
         {tab === "resa" && <BookingsTab />}
         {tab === "dispo" && <AvailabilityTab />}
         {tab === "galerie" && <GalleryTab />}
+        {tab === "agenda" && <AgendaTab />}
       </main>
     </div>
   );
@@ -418,6 +420,87 @@ function GalleryTab() {
           outline: none;
         }
       `}</style>
+    </div>
+  );
+}
+
+/* -------------------- Onglet Agenda (abonnement iPhone) -------------------- */
+
+function AgendaTab() {
+  const [origin, setOrigin] = useState("https://ton-site.vercel.app");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") setOrigin(window.location.origin);
+  }, []);
+
+  const httpsUrl = `${origin}/api/calendar?key=TA_CLE`;
+  const webcalUrl = httpsUrl.replace(/^https?:\/\//, "webcal://");
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(webcalUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  return (
+    <div>
+      <h1 className="font-display text-3xl font-bold">Agenda iPhone</h1>
+      <p className="mt-1 text-sm text-ink/50">
+        Abonne ton iPhone une seule fois : chaque RDV apparaît ensuite tout seul
+        dans ton agenda.
+      </p>
+
+      <div className="mt-8 rounded-2xl border border-line bg-white/50 p-5">
+        <div className="text-xs font-semibold uppercase text-ink/50">
+          Lien d’abonnement
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <code className="flex-1 break-all rounded-xl bg-ink/[0.05] px-3 py-2 text-sm">
+            {webcalUrl}
+          </code>
+          <button
+            onClick={copy}
+            className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-cream transition hover:bg-violet"
+          >
+            {copied ? "Copié ✓" : "Copier"}
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-ink/50">
+          Remplace <strong>TA_CLE</strong> par le code que tu as défini dans la
+          variable <code>CALENDAR_FEED_KEY</code> (sur Vercel). Garde ce lien
+          privé : il donne accès à tes RDV.
+        </p>
+      </div>
+
+      <div className="mt-8 rounded-2xl border border-line bg-white/50 p-5">
+        <div className="text-sm font-semibold">Étapes sur iPhone</div>
+        <ol className="mt-3 space-y-2 text-sm text-ink/70">
+          {[
+            "Copie le lien ci-dessus (avec ta vraie clé).",
+            "iPhone → Réglages → Applications → Calendrier → Comptes.",
+            "Ajouter un compte → Autre → Ajouter un calendrier avec abonnement.",
+            "Colle le lien, valide.",
+            "Tes RDV FD7.CUT apparaissent maintenant dans l’app Calendrier 🎉",
+          ].map((s, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet text-[11px] font-bold text-cream">
+                {i + 1}
+              </span>
+              {s}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-violet/30 bg-violet/5 p-5 text-sm text-ink/70">
+        ⚡ Fonctionne uniquement quand le site tourne sur <strong>Firebase</strong>{" "}
+        (les RDV doivent être stockés en ligne). En mode démo, l’agenda reste vide.
+        L’iPhone actualise le calendrier automatiquement (toutes les ~15 min à
+        quelques heures selon les réglages).
+      </div>
     </div>
   );
 }
