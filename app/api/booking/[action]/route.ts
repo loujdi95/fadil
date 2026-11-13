@@ -60,7 +60,7 @@ export async function GET(
 
   if (action === "confirm") {
     await ref.update({ status: "confirmed" });
-    return page("Rendez-vous confirmé ✂️", `${who} est validé. Le créneau est réservé.`);
+    return page("Rendez-vous confirmé", `${who} est validé. Le créneau est réservé.`);
   }
   await ref.delete();
   return page("Rendez-vous annulé", `${who} a été annulé. Le créneau est de nouveau libre.`);

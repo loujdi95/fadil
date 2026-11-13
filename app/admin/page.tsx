@@ -25,6 +25,7 @@ import {
   startOfWeek,
   occupiedSlots,
 } from "@/lib/booking";
+import { HomeIcon, CalendarIcon, UsersIcon, GridIcon, DeviceIcon } from "@/components/ui-icons";
 import TodayTab from "@/components/admin/TodayTab";
 import BookingsTab from "@/components/admin/BookingsTab";
 import ClientsTab from "@/components/admin/ClientsTab";
@@ -126,12 +127,12 @@ function Login({ onDone }: { onDone: () => void }) {
 
 type Tab = "today" | "resa" | "clients" | "dispo" | "agenda";
 
-const TABS: { k: Tab; label: string; icon: string }[] = [
-  { k: "today", label: "Aujourd’hui", icon: "🏠" },
-  { k: "resa", label: "RDV", icon: "📅" },
-  { k: "clients", label: "Clients", icon: "👥" },
-  { k: "dispo", label: "Planning", icon: "🗓️" },
-  { k: "agenda", label: "iPhone", icon: "📱" },
+const TABS: { k: Tab; label: string; Icon: (p: { className?: string }) => React.ReactElement }[] = [
+  { k: "today", label: "Aujourd’hui", Icon: HomeIcon },
+  { k: "resa", label: "RDV", Icon: CalendarIcon },
+  { k: "clients", label: "Clients", Icon: UsersIcon },
+  { k: "dispo", label: "Planning", Icon: GridIcon },
+  { k: "agenda", label: "iPhone", Icon: DeviceIcon },
 ];
 
 function Dashboard() {
@@ -183,15 +184,15 @@ function Dashboard() {
 
       {/* barre du bas (téléphone) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-cream/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        {TABS.map(({ k, label, icon }) => (
+        {TABS.map(({ k, label, Icon }) => (
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold transition ${
+            className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition ${
               tab === k ? "text-violet" : "text-ink/45"
             }`}
           >
-            <span className={`text-lg transition ${tab === k ? "scale-110" : "grayscale"}`}>{icon}</span>
+            <Icon className="h-[22px] w-[22px]" />
             {label}
           </button>
         ))}
@@ -320,7 +321,7 @@ function AvailabilityTab() {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="font-display text-3xl font-bold">Ton planning</h1>
-        {toast && <span className="text-sm font-semibold text-violet">Enregistré ✓</span>}
+        {toast && <span className="text-sm font-semibold text-violet">Enregistré</span>}
       </div>
       <p className="mt-1 text-sm text-ink/50">
         Tu es <strong>dispo par défaut</strong>. Mets un jour <strong>OFF</strong>, ou clique
@@ -594,7 +595,7 @@ function AgendaTab() {
             disabled={!valid || state === "saving" || icloud.trim() === savedIcloud}
             className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-cream transition hover:bg-violet disabled:opacity-40"
           >
-            {state === "saving" ? "…" : state === "saved" ? "Enregistré ✓" : "Enregistrer"}
+            {state === "saving" ? "…" : state === "saved" ? "Enregistré" : "Enregistrer"}
           </button>
         </div>
         {!valid && <p className="mt-2 text-xs text-red-600">Le lien doit commencer par webcal:// ou https://</p>}
@@ -620,7 +621,7 @@ function AgendaTab() {
             disabled={!feed}
             className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-cream transition hover:bg-violet disabled:opacity-40"
           >
-            {copied ? "Copié ✓" : "Copier"}
+            {copied ? "Copié" : "Copier"}
           </button>
         </div>
         <ol className="mt-4 space-y-2 text-sm text-ink/70">
@@ -628,7 +629,7 @@ function AgendaTab() {
             "Copie le lien ci-dessus (envoie-le toi par message pour l’avoir sur l’iPhone).",
             "iPhone → Réglages → Apps → Calendrier → Comptes → Ajouter un compte.",
             "Autre → « Ajouter un calendrier avec abonnement » → colle le lien.",
-            "Les RDV FD7.CUT apparaissent dans Calendrier (⏳ = en attente de validation).",
+            "Les RDV FD7.CUT apparaissent dans Calendrier (« À valider » = pas encore confirmé).",
           ].map((s, i) => (
             <li key={i} className="flex gap-3">
               <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/10 text-[11px] font-bold">{i + 1}</span>

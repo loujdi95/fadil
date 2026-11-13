@@ -13,11 +13,12 @@ import {
   confirmMessage,
   reminderMessage,
 } from "./utils";
+import { PhoneIcon, MessageIcon, WhatsAppIcon, CheckIcon } from "@/components/ui-icons";
 
 const STATUS = {
   pending: { label: "À valider", cls: "bg-violet/15 text-violet" },
   confirmed: { label: "Confirmé", cls: "bg-green-600/15 text-green-700" },
-  noshow: { label: "Lapin 🐰", cls: "bg-red-500/15 text-red-600" },
+  noshow: { label: "Pas venu", cls: "bg-red-500/15 text-red-600" },
 } as const;
 
 export default function BookingCard({
@@ -83,9 +84,9 @@ export default function BookingCard({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {b.phone && (
           <>
-            <a href={telUrl(b.phone)} className="chip">📞 Appeler</a>
-            <a href={smsUrl(b.phone, msg)} className="chip">💬 SMS</a>
-            <a href={whatsappUrl(b.phone, msg)} target="_blank" rel="noreferrer" className="chip">🟢 WhatsApp</a>
+            <a href={telUrl(b.phone)} className="chip"><PhoneIcon /> Appeler</a>
+            <a href={smsUrl(b.phone, msg)} className="chip"><MessageIcon /> SMS</a>
+            <a href={whatsappUrl(b.phone, msg)} target="_blank" rel="noreferrer" className="chip"><WhatsAppIcon /> WhatsApp</a>
           </>
         )}
 
@@ -101,7 +102,7 @@ export default function BookingCard({
               }
               className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-cream transition hover:bg-violet"
             >
-              ✓ Confirmer
+              <span className="inline-flex items-center gap-1.5"><CheckIcon /> Confirmer</span>
             </button>
           )}
           {past && st === "confirmed" && (

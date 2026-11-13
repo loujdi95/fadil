@@ -43,7 +43,7 @@ export default function TodayTab({ goTo }: { goTo: (tab: "resa") => void }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold capitalize text-violet">{shortDay(today)}</p>
-          <h1 className="font-display text-3xl font-bold">{hello} ✂️</h1>
+          <h1 className="font-display text-3xl font-bold">{hello}</h1>
         </div>
         <button
           onClick={() => setAdding(true)}
@@ -58,7 +58,7 @@ export default function TodayTab({ goTo }: { goTo: (tab: "resa") => void }) {
         <Stat label="À valider" value={pending.length} accent={pending.length > 0} onClick={() => goTo("resa")} />
         <Stat label="Aujourd’hui" value={todayList.length} />
         <Stat label="Cette semaine" value={week.length} />
-        <Stat label="Lapins ce mois" value={noshowMonth.length} />
+        <Stat label="Absences ce mois" value={noshowMonth.length} />
       </div>
 
       {/* Prochain client */}

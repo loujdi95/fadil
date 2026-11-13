@@ -4,6 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { getAllBookings } from "@/lib/store";
 import { dateKey, type Booking } from "@/lib/booking";
 import { clientKey, shortDay, telUrl, smsUrl, whatsappUrl } from "./utils";
+import {
+  SearchIcon,
+  StarIcon,
+  ScissorsIcon,
+  AlertIcon,
+  PhoneIcon,
+  MessageIcon,
+  WhatsAppIcon,
+} from "@/components/ui-icons";
 
 type Client = {
   key: string;
@@ -63,12 +72,15 @@ export default function ClientsTab() {
       </p>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="🔍 Chercher un client"
-          className="admin-input flex-1"
-        />
+        <div className="relative flex-1">
+          <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Chercher un client"
+            className="admin-input !pl-10"
+          />
+        </div>
         <select value={sort} onChange={(e) => setSort(e.target.value as "visits" | "recent")} className="admin-input w-auto">
           <option value="visits">Les plus fidèles</option>
           <option value="recent">Vus récemment</option>
@@ -90,8 +102,13 @@ export default function ClientsTab() {
                   {c.name[0]?.toUpperCase()}
                 </span>
                 <div>
-                  <div className="font-semibold">
-                    {c.name} {c.visits >= 5 && <span title="Client fidèle">⭐</span>}
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    {c.name}
+                    {c.visits >= 5 && (
+                      <span title="Client fidèle" className="inline-flex items-center gap-1 rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-bold uppercase text-violet">
+                        <StarIcon className="h-3 w-3" /> Fidèle
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm text-ink/50">{c.phone || "pas de numéro"}</div>
                 </div>
@@ -103,17 +120,21 @@ export default function ClientsTab() {
             </div>
 
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/60">
-              <span>✂️ {c.favorite}</span>
+              <span className="inline-flex items-center gap-1"><ScissorsIcon className="h-3.5 w-3.5" /> {c.favorite}</span>
               {c.last && <span>Dernière : {shortDay(c.last)}</span>}
               {c.next && <span className="font-semibold text-violet">Prochain : {shortDay(c.next.date)} {c.next.slotLabel}</span>}
-              {c.noshows > 0 && <span className="font-semibold text-red-600">🐰 {c.noshows} lapin{c.noshows > 1 ? "s" : ""}</span>}
+              {c.noshows > 0 && (
+                <span className="inline-flex items-center gap-1 font-semibold text-red-600">
+                  <AlertIcon className="h-3.5 w-3.5" /> {c.noshows} absence{c.noshows > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
 
             {c.phone && (
               <div className="mt-3 flex gap-2">
-                <a href={telUrl(c.phone)} className="chip">📞</a>
-                <a href={smsUrl(c.phone)} className="chip">💬</a>
-                <a href={whatsappUrl(c.phone)} target="_blank" rel="noreferrer" className="chip">🟢 WhatsApp</a>
+                <a href={telUrl(c.phone)} className="chip" aria-label="Appeler"><PhoneIcon /> Appeler</a>
+                <a href={smsUrl(c.phone)} className="chip" aria-label="SMS"><MessageIcon /> SMS</a>
+                <a href={whatsappUrl(c.phone)} target="_blank" rel="noreferrer" className="chip"><WhatsAppIcon /> WhatsApp</a>
               </div>
             )}
           </div>

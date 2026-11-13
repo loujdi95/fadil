@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { MEDIA, type Media } from "@/lib/media";
 import { SITE } from "@/lib/site";
 import { InstagramIcon } from "./icons";
+import { CloseIcon, ChevronIcon } from "./ui-icons";
 
 const INITIAL = 6;
 
@@ -174,20 +175,22 @@ function Lightbox({
         )}
       </div>
 
-      <button onClick={onClose} aria-label="Fermer" className="lb-btn right-4 top-4">✕</button>
+      <button onClick={onClose} aria-label="Fermer" className="lb-btn right-4 top-4">
+        <CloseIcon className="h-5 w-5" />
+      </button>
       <button
         onClick={(e) => { e.stopPropagation(); go(-1); }}
         aria-label="Précédent"
         className="lb-btn left-3 top-1/2 hidden -translate-y-1/2 sm:flex"
       >
-        ‹
+        <ChevronIcon dir="left" />
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); go(1); }}
         aria-label="Suivant"
         className="lb-btn right-3 top-1/2 hidden -translate-y-1/2 sm:flex"
       >
-        ›
+        <ChevronIcon />
       </button>
       <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
         {index + 1} / {MEDIA.length}

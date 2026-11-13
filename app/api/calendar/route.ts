@@ -74,7 +74,7 @@ export async function GET(req: Request) {
       `DTSTAMP:${stamp}`,
       `DTSTART:${start}`,
       `DTEND:${end}`,
-      `SUMMARY:${esc(`${confirmed ? "" : "⏳ "}${b.prestation} — ${b.name}`)}`,
+      `SUMMARY:${esc(`${confirmed ? "" : "[À valider] "}${b.prestation} — ${b.name}`)}`,
       `DESCRIPTION:${esc(
         `Tél : ${b.phone}${b.afterHour ? "\nAfter hour (+5)" : ""}${
           b.note ? `\nNote : ${b.note}` : ""

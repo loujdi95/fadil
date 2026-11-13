@@ -16,6 +16,7 @@ import {
   PRESTATIONS,
   AFTER_HOUR_FROM,
 } from "@/lib/booking";
+import { CloseIcon } from "@/components/ui-icons";
 
 export default function AddBookingModal({
   onClose,
@@ -96,8 +97,8 @@ export default function AddBookingModal({
       >
         <div className="flex items-center justify-between">
           <h2 className="font-display text-2xl font-bold">Ajouter un RDV</h2>
-          <button type="button" onClick={onClose} className="h-9 w-9 rounded-full bg-ink/5 text-lg" aria-label="Fermer">
-            ✕
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-ink/5" aria-label="Fermer">
+            <CloseIcon className="h-4 w-4" />
           </button>
         </div>
         <p className="mt-1 text-sm text-ink/50">Client au téléphone ou passé au salon. Confirmé direct.</p>

@@ -44,11 +44,11 @@ export function whatsappUrl(phone: string, text = "") {
 
 /** Message tout prêt pour confirmer / rappeler un RDV */
 export function confirmMessage(b: Booking) {
-  return `Salut ${b.name.split(" ")[0]} ! C'est FD7.CUT ✂️ Ton RDV est confirmé : ${shortDay(b.date)} à ${b.slotLabel} (${b.prestation}). À tout à l'heure !`;
+  return `Salut ${b.name.split(" ")[0]} ! C'est FD7.CUT. Ton RDV est confirmé : ${shortDay(b.date)} à ${b.slotLabel} (${b.prestation}). À tout à l'heure !`;
 }
 
 export function reminderMessage(b: Booking) {
-  return `Salut ${b.name.split(" ")[0]} ! Petit rappel FD7.CUT ✂️ : ton RDV c'est ${shortDay(b.date)} à ${b.slotLabel}. Si t'as un empêchement, préviens-moi stp 🙏`;
+  return `Salut ${b.name.split(" ")[0]} ! Petit rappel FD7.CUT : ton RDV c'est ${shortDay(b.date)} à ${b.slotLabel}. Si t'as un empêchement, préviens-moi stp.`;
 }
 
 /** Clé client stable (téléphone normalisé, sinon nom) */

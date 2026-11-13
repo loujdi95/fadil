@@ -6,6 +6,7 @@ import { dateKey, type Booking } from "@/lib/booking";
 import BookingCard from "./BookingCard";
 import AddBookingModal from "./AddBookingModal";
 import { shortDay } from "./utils";
+import { SearchIcon } from "@/components/ui-icons";
 
 type Filter = "pending" | "upcoming" | "past";
 
@@ -85,12 +86,15 @@ export default function BookingsTab() {
         ))}
       </div>
 
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="🔍 Chercher un nom ou un numéro"
-        className="admin-input mt-4"
-      />
+      <div className="relative mt-4">
+        <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Chercher un nom ou un numéro"
+          className="admin-input !pl-10"
+        />
+      </div>
 
       <div className="mt-6 space-y-8">
         {all === null && <p className="text-ink/40">Chargement…</p>}

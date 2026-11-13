@@ -181,7 +181,7 @@ export default function Booking() {
               <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h3 className="mt-6 font-display text-3xl font-bold">Demande envoyée ✂️</h3>
+          <h3 className="mt-6 font-display text-3xl font-bold">Demande envoyée</h3>
           <p className="mt-3 text-ink/70">
             {labelDate(selected)} à <strong>{slot.label}</strong> — {form.prestation}.
           </p>

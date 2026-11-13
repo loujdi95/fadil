@@ -7,6 +7,7 @@ import {
   fmt,
 } from "@/lib/booking";
 import { ArrowIcon } from "./icons";
+import { MoonIcon } from "./ui-icons";
 
 export default function Schedule() {
   return (
@@ -48,7 +49,9 @@ export default function Schedule() {
 
           {/* after hour */}
           <div data-reveal className="flex items-center gap-4 rounded-2xl bg-ink p-5 text-cream sm:col-span-2 lg:col-span-1">
-            <span className="text-2xl">🌙</span>
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream/10 text-violet-bright">
+              <MoonIcon className="h-5 w-5" />
+            </span>
             <div>
               <div className="font-display text-lg font-bold">After hour</div>
               <div className="text-sm text-cream/60">
