@@ -3,24 +3,11 @@
 import { useEffect } from "react";
 
 /**
- * Anime l'apparition au scroll de tous les éléments [data-reveal].
- * Décalage automatique (stagger) pour les éléments frères d'un même parent.
- * À monter une seule fois dans la page.
+ * Anime l'apparition au scroll des éléments [data-reveal], y compris ceux
+ * ajoutés plus tard (ex : « Voir plus »). Décalage en cascade entre frères.
  */
 export default function ScrollReveal() {
   useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
-
-    // délai en cascade entre frères directs
-    const seen = new Map<Element, number>();
-    els.forEach((el) => {
-      const parent = el.parentElement;
-      if (!parent) return;
-      const n = seen.get(parent) ?? 0;
-      el.style.transitionDelay = `${Math.min(n * 90, 450)}ms`;
-      seen.set(parent, n + 1);
-    });
-
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -30,11 +17,30 @@ export default function ScrollReveal() {
           }
         });
       },
-      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" },
+      { threshold: 0.12, rootMargin: "0px 0px -6% 0px" },
     );
 
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    const seen = new WeakSet<Element>();
+    const scan = () => {
+      const counters = new Map<Element, number>();
+      document.querySelectorAll<HTMLElement>("[data-reveal]").forEach((el) => {
+        if (seen.has(el)) return;
+        seen.add(el);
+        const parent = el.parentElement;
+        const n = parent ? counters.get(parent) ?? 0 : 0;
+        if (parent) counters.set(parent, n + 1);
+        el.style.transitionDelay = `${Math.min(n * 80, 400)}ms`;
+        io.observe(el);
+      });
+    };
+
+    scan();
+    const mo = new MutationObserver(scan);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      io.disconnect();
+      mo.disconnect();
+    };
   }, []);
 
   return null;

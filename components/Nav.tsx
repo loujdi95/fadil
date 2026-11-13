@@ -37,7 +37,7 @@ export default function Nav() {
 
         <div className="hidden items-center gap-8 text-sm font-medium md:flex">
           <a href="#galerie" className="opacity-80 transition hover:opacity-100">Galerie</a>
-          <a href="#horaires" className="opacity-80 transition hover:opacity-100">Horaires</a>
+          <a href="#horaires" className="opacity-80 transition hover:opacity-100">Prestations</a>
           <a href="#reseaux" className="opacity-80 transition hover:opacity-100">Réseaux</a>
         </div>
 

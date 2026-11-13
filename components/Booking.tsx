@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   generateSlots,
   dateKey,
@@ -11,6 +11,7 @@ import {
   AFTER_HOUR_SURCHARGE,
   prestationSpan,
   occupiedSlots,
+  fmt,
   type Slot,
   type Booking as BookingType,
 } from "@/lib/booking";
@@ -32,6 +33,8 @@ const MONTHS = [
   "juillet", "août", "septembre", "octobre", "novembre", "décembre",
 ];
 
+const MONTHS_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
 function labelDate(d: Date) {
   return `${WEEKDAYS[weekdayIndex(d)]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
@@ -39,6 +42,7 @@ function labelDate(d: Date) {
 export default function Booking() {
   const [avail, setAvail] = useState<Availability>(DEFAULT_AVAILABILITY);
   const [blocks, setBlocks] = useState<Blocks>(DEFAULT_BLOCKS);
+  const formRef = useRef<HTMLFormElement>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selected, setSelected] = useState<Date | null>(null);
   const [taken, setTaken] = useState<Set<number>>(new Set());
@@ -207,18 +211,41 @@ export default function Booking() {
           Réservation
         </p>
         <h2 className="mt-3 font-display text-4xl font-bold md:text-5xl">
-          Choisis ton créneau
+          Prends ton créneau
         </h2>
         <p className="mt-4 text-ink/70">
-          Créneaux de 40 min. Un rendez-vous après 20h ? C’est possible en{" "}
+          3 étapes, 30 secondes. Un rendez-vous après 20h ? C’est possible en{" "}
           <span className="font-semibold text-ink">after hour</span> (+{AFTER_HOUR_SURCHARGE} sur la presta).
         </p>
       </div>
 
       <div className="mt-12 grid gap-8 lg:grid-cols-[1fr_1.1fr]">
-        {/* Colonne 1 : semaine + jours */}
+        {/* Colonne 1 : prestation + jour + heure */}
         <div data-reveal className="rounded-3xl border border-line bg-white/50 p-6">
-          <div className="flex items-center justify-between">
+          <Step n={1} title="Ta prestation" />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {PRESTATIONS.map((p) => {
+              const on = form.prestation === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setForm({ ...form, prestation: p })}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    on ? "border-violet bg-violet text-cream" : "border-ink/15 hover:border-ink"
+                  }`}
+                >
+                  {p}
+                  <span className={`ml-1.5 text-xs ${on ? "text-cream/70" : "text-ink/40"}`}>
+                    {prestationSpan(p) * 40} min
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-7"><Step n={2} title="Le jour" /></div>
+          <div className="mt-3 flex items-center justify-between">
             <button
               onClick={() => canPrev && setWeekStart((w) => addDays(w, -7))}
               disabled={!canPrev}
@@ -228,8 +255,8 @@ export default function Booking() {
               <ArrowIcon className="h-4 w-4 rotate-180" />
             </button>
             <div className="text-center text-sm font-semibold">
-              {days[0].getDate()} {MONTHS[days[0].getMonth()].slice(0, 4)} —{" "}
-              {days[6].getDate()} {MONTHS[days[6].getMonth()].slice(0, 4)}
+              {days[0].getDate()} {MONTHS_SHORT[days[0].getMonth()]} —{" "}
+              {days[6].getDate()} {MONTHS_SHORT[days[6].getMonth()]}
             </div>
             <button
               onClick={() => setWeekStart((w) => addDays(w, 7))}
@@ -268,17 +295,18 @@ export default function Booking() {
           </div>
 
           {/* créneaux */}
-          <div className="mt-6 border-t border-line pt-6">
+          <div className="mt-7 border-t border-line pt-6">
+            <Step n={3} title="L’heure" />
             {!selected && (
               <p className="py-8 text-center text-sm text-ink/50">
-                Sélectionne un jour disponible.
+                Sélectionne d’abord un jour.
               </p>
             )}
             {selected && loadingSlots && (
               <p className="py-8 text-center text-sm text-ink/50">Chargement…</p>
             )}
             {selected && !loadingSlots && (
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {visibleSlots.length === 0 && (
                   <p className="col-span-full py-4 text-center text-sm text-ink/50">
                     Plus de créneau disponible ce jour.
@@ -291,7 +319,13 @@ export default function Booking() {
                     <button
                       key={s.value}
                       disabled={isTaken}
-                      onClick={() => setSlot(s)}
+                      onClick={() => {
+                        setSlot(s);
+                        // sur téléphone : descend direct au formulaire
+                        if (window.innerWidth < 1024) {
+                          setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+                        }
+                      }}
                       className={`relative rounded-xl border py-2.5 text-sm font-semibold transition ${
                         isSel
                           ? "border-violet bg-violet text-cream"
@@ -320,6 +354,7 @@ export default function Booking() {
 
         {/* Colonne 2 : formulaire */}
         <form
+          ref={formRef}
           onSubmit={submit}
           data-reveal
           className="rounded-3xl border border-line bg-white/50 p-6 md:p-8"
@@ -354,17 +389,6 @@ export default function Booking() {
                 className="input"
               />
             </Field>
-            <Field label="Prestation">
-              <select
-                value={form.prestation}
-                onChange={(e) => setForm({ ...form, prestation: e.target.value })}
-                className="input"
-              >
-                {PRESTATIONS.map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-            </Field>
             <Field label="Note (optionnel)">
               <input
                 value={form.note}
@@ -378,18 +402,23 @@ export default function Booking() {
           {/* récap */}
           <div className="mt-6 rounded-2xl bg-ink/[0.04] p-4 text-sm">
             {selected && slot ? (
-              <div className="flex items-center justify-between">
-                <span className="text-ink/70">
-                  {labelDate(selected)} · <strong className="text-ink">{slot.label}</strong>
-                </span>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-ink">{form.prestation}</div>
+                  <div className="text-ink/60">
+                    {labelDate(selected)} · <strong className="text-ink">{slot.label}</strong>
+                    {" → "}
+                    {fmt(slot.value + span * 40)}
+                  </div>
+                </div>
                 {slot.afterHour && (
-                  <span className="rounded-full bg-violet px-2.5 py-1 text-xs font-semibold text-cream">
+                  <span className="shrink-0 rounded-full bg-violet px-2.5 py-1 text-xs font-semibold text-cream">
                     After hour +{AFTER_HOUR_SURCHARGE}
                   </span>
                 )}
               </div>
             ) : (
-              <span className="text-ink/50">Choisis un jour et un créneau à gauche.</span>
+              <span className="text-ink/50">Choisis ta prestation, un jour et une heure.</span>
             )}
           </div>
 
@@ -434,6 +463,17 @@ export default function Booking() {
         }
       `}</style>
     </section>
+  );
+}
+
+function Step({ n, title }: { n: number; title: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink font-display text-xs font-bold text-cream">
+        {n}
+      </span>
+      <span className="text-sm font-bold uppercase tracking-wider">{title}</span>
+    </div>
   );
 }
 

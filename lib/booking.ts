@@ -82,7 +82,8 @@ export function occupiedSlots(start: number, span: number): number[] {
   return Array.from({ length: Math.max(1, span) }, (_, i) => start + i * SLOT_MINUTES);
 }
 
-export type BookingStatus = "pending" | "confirmed";
+/** pending = à valider · confirmed = validé · noshow = client pas venu (lapin) */
+export type BookingStatus = "pending" | "confirmed" | "noshow";
 
 export type Booking = {
   id?: string;
@@ -98,6 +99,7 @@ export type Booking = {
   note?: string;
   status?: BookingStatus; // "pending" par défaut (à valider par le coiffeur)
   token?: string;         // jeton secret pour valider/annuler depuis l'e-mail
+  source?: "site" | "admin"; // réservé en ligne ou ajouté par le coiffeur
   createdAt?: number;
 };
 

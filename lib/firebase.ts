@@ -13,7 +13,8 @@ const config = {
 };
 
 /** Firebase est-il configuré ? Sinon le site tourne en mode démo. */
-export const isFirebaseReady = Boolean(config.apiKey && config.projectId);
+export const isFirebaseReady =
+  Boolean(config.apiKey && config.projectId) && process.env.NEXT_PUBLIC_FORCE_DEMO !== "1";
 
 let app: FirebaseApp | null = null;
 let dbInstance: Firestore | null = null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { db, isFirebaseReady } from "./firebase";
+import { db, auth, isFirebaseReady } from "./firebase";
 import {
   collection,
   doc,
@@ -189,6 +189,41 @@ export async function createBooking(
   all.push({ ...payload, id });
   lsSet(LS.bookings, all);
   return { ok: true, id, token };
+}
+
+/** RDV ajouté par le coiffeur depuis l'admin (déjà confirmé). */
+export async function adminCreateBooking(
+  b: Booking,
+): Promise<{ ok: boolean; reason?: string }> {
+  if (isFirebaseReady && auth) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) return { ok: false, reason: "Reconnecte-toi." };
+    try {
+      const res = await fetch("/api/admin/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(b),
+      });
+      return await res.json();
+    } catch {
+      return { ok: false, reason: "Connexion impossible." };
+    }
+  }
+  const all = lsGet<Booking[]>(LS.bookings, []);
+  const wanted = occupiedSlots(b.slot, b.span ?? 1);
+  if (
+    all.some(
+      (e) =>
+        e.date === b.date &&
+        e.status !== "noshow" &&
+        occupiedSlots(e.slot, e.span ?? 1).some((m) => wanted.includes(m)),
+    )
+  ) {
+    return { ok: false, reason: "Ce créneau est déjà réservé." };
+  }
+  all.push({ ...b, status: "confirmed", source: "admin", id: crypto.randomUUID(), createdAt: Date.now() });
+  lsSet(LS.bookings, all);
+  return { ok: true };
 }
 
 export async function setBookingStatus(id: string, status: BookingStatus): Promise<void> {

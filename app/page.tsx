@@ -7,6 +7,7 @@ import Booking from "@/components/Booking";
 import Socials from "@/components/Socials";
 import Footer from "@/components/Footer";
 import ScrollReveal from "@/components/ScrollReveal";
+import MobileCTA from "@/components/MobileCTA";
 
 export default function Home() {
   return (
@@ -22,6 +23,7 @@ export default function Home() {
         <Socials />
       </main>
       <Footer />
+      <MobileCTA />
     </>
   );
 }

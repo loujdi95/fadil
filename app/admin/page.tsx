@@ -10,20 +10,12 @@ import {
   saveBlocks,
   getIcloudUrl,
   saveIcloudUrl,
-  getAllBookings,
   getBookingsForDate,
-  deleteBooking,
-  setBookingStatus,
-  getGallery,
-  removeGalleryItem,
   DEFAULT_AVAILABILITY,
   DEFAULT_BLOCKS,
   type Availability,
   type Blocks,
-  type GalleryItem,
 } from "@/lib/store";
-import { uploadGalleryImage } from "@/lib/gallery-upload";
-import { notifyClientConfirmed } from "@/lib/notify";
 import {
   WEEKDAYS,
   fmt,
@@ -31,8 +23,11 @@ import {
   dateKey,
   weekdayIndex,
   startOfWeek,
-  type Booking,
+  occupiedSlots,
 } from "@/lib/booking";
+import TodayTab from "@/components/admin/TodayTab";
+import BookingsTab from "@/components/admin/BookingsTab";
+import ClientsTab from "@/components/admin/ClientsTab";
 
 export default function AdminPage() {
   const [ready, setReady] = useState(false);
@@ -129,33 +124,42 @@ function Login({ onDone }: { onDone: () => void }) {
 
 /* -------------------- Dashboard -------------------- */
 
+type Tab = "today" | "resa" | "clients" | "dispo" | "agenda";
+
+const TABS: { k: Tab; label: string; icon: string }[] = [
+  { k: "today", label: "Aujourd’hui", icon: "🏠" },
+  { k: "resa", label: "RDV", icon: "📅" },
+  { k: "clients", label: "Clients", icon: "👥" },
+  { k: "dispo", label: "Planning", icon: "🗓️" },
+  { k: "agenda", label: "iPhone", icon: "📱" },
+];
+
 function Dashboard() {
-  const [tab, setTab] = useState<"resa" | "dispo" | "galerie" | "agenda">("resa");
+  const [tab, setTab] = useState<Tab>("today");
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [tab]);
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-line bg-cream/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-          <div className="font-display text-lg font-extrabold">
-            FD7<span className="text-violet">.</span>CUT · admin
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="/" className="text-sm text-ink/50 hover:text-ink">Voir le site</a>
+    <div className="min-h-screen pb-24 md:pb-0">
+      <header className="sticky top-0 z-20 border-b border-line bg-cream/90 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo/logo-dark.png" alt="FD7" className="h-7 w-auto" />
+          <div className="flex items-center gap-2">
+            <a href="/" target="_blank" className="rounded-full px-3 py-2 text-sm text-ink/50 hover:text-ink">Voir le site ↗</a>
             <button
-              onClick={() => signOut()}
-              className="rounded-full border border-ink/15 px-4 py-2 text-sm font-semibold transition hover:border-ink"
+              onClick={async () => { await signOut(); window.location.reload(); }}
+              className="rounded-full border border-ink/15 px-3 py-2 text-sm font-semibold transition hover:border-ink"
             >
               Déconnexion
             </button>
           </div>
         </div>
-        <div className="mx-auto flex max-w-5xl gap-1 px-5">
-          {([
-            ["resa", "Réservations"],
-            ["dispo", "Disponibilités"],
-            ["galerie", "Galerie"],
-            ["agenda", "Agenda"],
-          ] as const).map(([k, label]) => (
+        {/* onglets (ordi) */}
+        <nav className="mx-auto hidden max-w-5xl gap-1 px-5 md:flex">
+          {TABS.map(({ k, label }) => (
             <button
               key={k}
               onClick={() => setTab(k)}
@@ -166,110 +170,71 @@ function Dashboard() {
               {label}
             </button>
           ))}
-        </div>
+        </nav>
       </header>
 
-      <main className="mx-auto max-w-5xl px-5 py-10">
+      <main className="mx-auto max-w-5xl px-5 py-8">
+        {tab === "today" && <TodayTab goTo={setTab} />}
         {tab === "resa" && <BookingsTab />}
+        {tab === "clients" && <ClientsTab />}
         {tab === "dispo" && <AvailabilityTab />}
-        {tab === "galerie" && <GalleryTab />}
         {tab === "agenda" && <AgendaTab />}
       </main>
-    </div>
-  );
-}
 
-/* -------------------- Onglet Réservations -------------------- */
+      {/* barre du bas (téléphone) */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-cream/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        {TABS.map(({ k, label, icon }) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold transition ${
+              tab === k ? "text-violet" : "text-ink/45"
+            }`}
+          >
+            <span className={`text-lg transition ${tab === k ? "scale-110" : "grayscale"}`}>{icon}</span>
+            {label}
+          </button>
+        ))}
+      </nav>
 
-function BookingsTab() {
-  const [bookings, setBookings] = useState<Booking[] | null>(null);
-
-  const load = () => getAllBookings().then(setBookings).catch(() => setBookings([]));
-  useEffect(() => { load(); }, []);
-
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = (bookings ?? []).filter((b) => b.date >= today);
-  const pending = (bookings ?? []).filter((b) => (b.status ?? "pending") === "pending");
-
-  return (
-    <div>
-      <h1 className="font-display text-3xl font-bold">Réservations</h1>
-      <p className="mt-1 text-sm text-ink/50">
-        <span className="font-semibold text-violet">{pending.length} à valider</span>
-        {" · "}{upcoming.length} à venir · {bookings?.length ?? 0} au total
-      </p>
-
-      <div className="mt-8 space-y-3">
-        {bookings === null && <p className="text-ink/40">Chargement…</p>}
-        {bookings?.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-ink/20 p-10 text-center text-ink/40">
-            Aucune réservation pour l’instant.
-          </div>
-        )}
-        {bookings?.map((b) => {
-          const st = b.status ?? "pending";
-          return (
-            <div
-              key={b.id}
-              className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white/50 p-4 ${
-                st === "pending" ? "border-violet/40" : "border-line"
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-ink text-cream">
-                  <span className="text-[10px] uppercase">{b.date.slice(8, 10)}/{b.date.slice(5, 7)}</span>
-                  <span className="font-display text-sm font-bold">{b.slotLabel}</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 font-semibold">
-                    {b.name}
-                    {st === "pending" ? (
-                      <span className="rounded-full bg-violet/15 px-2 py-0.5 text-[10px] font-bold uppercase text-violet">
-                        En attente
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-green-600/15 px-2 py-0.5 text-[10px] font-bold uppercase text-green-700">
-                        Confirmé
-                      </span>
-                    )}
-                    {b.afterHour && (
-                      <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold text-cream">
-                        after +5
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm text-ink/60">
-                    {b.prestation} · <a href={`tel:${b.phone}`} className="hover:text-violet">{b.phone}</a>
-                  </div>
-                  {b.note && <div className="text-xs text-ink/40">“{b.note}”</div>}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {st === "pending" && (
-                  <button
-                    onClick={async () => {
-                      if (b.id) {
-                        await setBookingStatus(b.id, "confirmed");
-                        notifyClientConfirmed(b); // e-mail au client
-                        load();
-                      }
-                    }}
-                    className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-cream transition hover:bg-violet"
-                  >
-                    Confirmer
-                  </button>
-                )}
-                <button
-                  onClick={async () => { if (b.id) { await deleteBooking(b.id); load(); } }}
-                  className="rounded-full border border-ink/15 px-4 py-2 text-sm font-medium text-ink/50 transition hover:border-red-500 hover:text-red-600"
-                >
-                  {st === "pending" ? "Refuser" : "Annuler"}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <style jsx global>{`
+        .admin-input {
+          width: 100%;
+          border-radius: 0.9rem;
+          border: 1px solid rgba(11, 11, 13, 0.15);
+          background: rgba(255, 255, 255, 0.7);
+          padding: 0.75rem 1rem;
+          outline: none;
+        }
+        .admin-input:focus {
+          border-color: var(--violet);
+          box-shadow: 0 0 0 3px var(--violet-glow);
+        }
+        .lbl {
+          display: block;
+          margin-bottom: 0.4rem;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: rgba(11, 11, 13, 0.5);
+        }
+        .chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          border-radius: 999px;
+          border: 1px solid rgba(11, 11, 13, 0.12);
+          background: rgba(255, 255, 255, 0.7);
+          padding: 0.45rem 0.8rem;
+          font-size: 0.8rem;
+          font-weight: 600;
+          transition: border-color 0.2s;
+        }
+        .chip:hover {
+          border-color: var(--ink);
+        }
+      `}</style>
     </div>
   );
 }
@@ -295,7 +260,13 @@ function AvailabilityTab() {
   useEffect(() => {
     if (!selected) return;
     getBookingsForDate(dateKey(selected))
-      .then((b) => setDayBookings(new Set(b.map((x) => x.slot))))
+      .then((b) =>
+        setDayBookings(
+          new Set(
+            b.filter((x) => x.status !== "noshow").flatMap((x) => occupiedSlots(x.slot, x.span ?? 1)),
+          ),
+        ),
+      )
       .catch(() => setDayBookings(new Set()));
   }, [selected]);
 
@@ -527,86 +498,6 @@ function hoursRange(fromH: number, toH: number): number[] {
   const out: number[] = [];
   for (let m = fromH * 60; m <= toH * 60; m += 30) out.push(m);
   return out;
-}
-
-/* -------------------- Onglet Galerie -------------------- */
-
-function GalleryTab() {
-  const [items, setItems] = useState<GalleryItem[] | null>(null);
-  const [caption, setCaption] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const load = () => getGallery().then(setItems).catch(() => setItems([]));
-  useEffect(() => { load(); }, []);
-
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setBusy(true);
-    try {
-      await uploadGalleryImage(file, caption.trim() || undefined);
-      setCaption("");
-      load();
-    } finally {
-      setBusy(false);
-      e.target.value = "";
-    }
-  }
-
-  return (
-    <div>
-      <h1 className="font-display text-3xl font-bold">Galerie</h1>
-      <p className="mt-1 text-sm text-ink/50">Ajoute tes coupes. Elles s’affichent sur la page d’accueil.</p>
-
-      <div className="mt-8 flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-white/50 p-4">
-        <label className="block flex-1">
-          <span className="mb-1.5 block text-xs font-semibold uppercase text-ink/50">Légende (optionnel)</span>
-          <input
-            className="admin-input"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="Dégradé + barbe"
-          />
-        </label>
-        <label className={`cursor-pointer rounded-full bg-ink px-6 py-3 font-semibold text-cream transition hover:bg-violet ${busy ? "opacity-50" : ""}`}>
-          {busy ? "Envoi…" : "+ Ajouter une photo"}
-          <input type="file" accept="image/*" onChange={onFile} disabled={busy} className="hidden" />
-        </label>
-      </div>
-
-      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-        {items?.map((it) => (
-          <figure key={it.id} className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-line bg-ink/5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={it.url} alt={it.caption || ""} className="h-full w-full object-cover" />
-            <button
-              onClick={async () => { await removeGalleryItem(it.id); load(); }}
-              className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100"
-              aria-label="Supprimer"
-            >
-              ✕
-            </button>
-          </figure>
-        ))}
-      </div>
-      {items?.length === 0 && (
-        <div className="mt-8 rounded-2xl border border-dashed border-ink/20 p-10 text-center text-ink/40">
-          Aucune photo. Ajoute ta première coupe ci-dessus.
-        </div>
-      )}
-
-      <style jsx global>{`
-        .admin-input {
-          width: 100%;
-          border-radius: 0.9rem;
-          border: 1px solid rgba(11, 11, 13, 0.15);
-          background: rgba(255, 255, 255, 0.7);
-          padding: 0.75rem 1rem;
-          outline: none;
-        }
-      `}</style>
-    </div>
-  );
 }
 
 /* -------------------- Onglet Agenda (iPhone <-> site) -------------------- */
