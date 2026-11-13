@@ -1,5 +1,5 @@
-import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
+import { parisDate } from "@/lib/paris";
 import type { Booking } from "@/lib/booking";
 import { SLOT_MINUTES } from "@/lib/booking";
 
@@ -11,15 +11,6 @@ import { SLOT_MINUTES } from "@/lib/booking";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const config = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -48,14 +39,15 @@ export async function GET(req: Request) {
   if (key !== expected) {
     return new Response("Clé invalide.", { status: 401 });
   }
-  if (!config.apiKey || !config.projectId) {
+  const db = adminDb();
+  if (!db) {
     return new Response("Firebase non configuré.", { status: 503 });
   }
 
-  const app = getApps().length ? getApps()[0] : initializeApp(config);
-  const db = getFirestore(app);
-  const snap = await getDocs(collection(db, "bookings"));
-  const bookings: Booking[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Booking) }));
+  // RDV des 30 derniers jours et à venir
+  const since = parisDate(-30);
+  const snap = await db.collection("bookings").where("date", ">=", since).get();
+  const bookings: Booking[] = snap.docs.map((d) => ({ ...(d.data() as Booking), id: d.id }));
 
   const now = new Date();
   const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(
@@ -74,7 +66,7 @@ export async function GET(req: Request) {
 
   for (const b of bookings) {
     const start = icsLocal(b.date, b.slot);
-    const end = icsLocal(b.date, b.slot + SLOT_MINUTES);
+    const end = icsLocal(b.date, b.slot + SLOT_MINUTES * (b.span ?? 1));
     const confirmed = (b.status ?? "pending") === "confirmed";
     lines.push(
       "BEGIN:VEVENT",

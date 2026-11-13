@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { isFirebaseReady } from "@/lib/firebase";
+import { isFirebaseReady, auth } from "@/lib/firebase";
 import { signIn, signOut, watchAuth, DEMO_PASSCODE } from "@/lib/auth";
 import {
   getAvailability,
   saveAvailability,
   getBlocks,
   saveBlocks,
+  getIcloudUrl,
+  saveIcloudUrl,
   getAllBookings,
   getBookingsForDate,
   deleteBooking,
@@ -523,7 +525,7 @@ function AvailabilityTab() {
 
 function hoursRange(fromH: number, toH: number): number[] {
   const out: number[] = [];
-  for (let m = fromH * 60; m <= toH * 60; m += 40) out.push(m);
+  for (let m = fromH * 60; m <= toH * 60; m += 30) out.push(m);
   return out;
 }
 
@@ -607,83 +609,155 @@ function GalleryTab() {
   );
 }
 
-/* -------------------- Onglet Agenda (abonnement iPhone) -------------------- */
+/* -------------------- Onglet Agenda (iPhone <-> site) -------------------- */
 
 function AgendaTab() {
-  const [origin, setOrigin] = useState("https://ton-site.vercel.app");
+  const [icloud, setIcloud] = useState("");
+  const [savedIcloud, setSavedIcloud] = useState("");
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [feed, setFeed] = useState<string | null>(null);
+  const [feedErr, setFeedErr] = useState("");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") setOrigin(window.location.origin);
+    getIcloudUrl().then((u) => { setIcloud(u); setSavedIcloud(u); }).catch(() => {});
+    (async () => {
+      try {
+        const token = await auth?.currentUser?.getIdToken();
+        if (!token) { setFeedErr("Disponible une fois Firebase connecté."); return; }
+        const res = await fetch("/api/admin/feed", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (res.ok) setFeed(data.webcal);
+        else setFeedErr(data.error === "CALENDAR_FEED_KEY manquant"
+          ? "Ajoute la variable CALENDAR_FEED_KEY sur Vercel."
+          : "Lien indisponible pour le moment.");
+      } catch {
+        setFeedErr("Lien indisponible pour le moment.");
+      }
+    })();
   }, []);
 
-  const httpsUrl = `${origin}/api/calendar?key=TA_CLE`;
-  const webcalUrl = httpsUrl.replace(/^https?:\/\//, "webcal://");
+  const valid = /^(webcal|https):\/\/.+/i.test(icloud.trim()) || icloud.trim() === "";
+
+  const saveIcloud = async () => {
+    if (!valid) return;
+    setState("saving");
+    try {
+      await saveIcloudUrl(icloud);
+      setSavedIcloud(icloud.trim());
+      setState("saved");
+      setTimeout(() => setState("idle"), 2000);
+    } catch {
+      setState("error");
+    }
+  };
 
   const copy = async () => {
+    if (!feed) return;
     try {
-      await navigator.clipboard.writeText(webcalUrl);
+      await navigator.clipboard.writeText(feed);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
 
   return (
-    <div>
-      <h1 className="font-display text-3xl font-bold">Agenda iPhone</h1>
-      <p className="mt-1 text-sm text-ink/50">
-        Abonne ton iPhone une seule fois : chaque RDV apparaît ensuite tout seul
-        dans ton agenda.
-      </p>
-
-      <div className="mt-8 rounded-2xl border border-line bg-white/50 p-5">
-        <div className="text-xs font-semibold uppercase text-ink/50">
-          Lien d’abonnement
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <code className="flex-1 break-all rounded-xl bg-ink/[0.05] px-3 py-2 text-sm">
-            {webcalUrl}
-          </code>
-          <button
-            onClick={copy}
-            className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-cream transition hover:bg-violet"
-          >
-            {copied ? "Copié ✓" : "Copier"}
-          </button>
-        </div>
-        <p className="mt-3 text-xs text-ink/50">
-          Remplace <strong>TA_CLE</strong> par le code que tu as défini dans la
-          variable <code>CALENDAR_FEED_KEY</code> (sur Vercel). Garde ce lien
-          privé : il donne accès à tes RDV.
-        </p>
+    <div className="space-y-8">
+      <div>
+        <h1 className="font-display text-3xl font-bold">Agenda iPhone</h1>
+        <p className="mt-1 text-sm text-ink/50">Relie ton iPhone au site, dans les deux sens.</p>
       </div>
 
-      <div className="mt-8 rounded-2xl border border-line bg-white/50 p-5">
-        <div className="text-sm font-semibold">Étapes sur iPhone</div>
-        <ol className="mt-3 space-y-2 text-sm text-ink/70">
+      {/* 1. iPhone -> site */}
+      <section className="rounded-2xl border border-line bg-white/50 p-5">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-violet px-2.5 py-0.5 text-[11px] font-bold text-cream">1</span>
+          <h2 className="font-semibold">Ton agenda iPhone bloque le site</h2>
+        </div>
+        <p className="mt-2 text-sm text-ink/60">
+          Chaque événement de ton agenda (rdv perso, sport, vacances…) rend les créneaux
+          indisponibles sur le site, automatiquement.
+        </p>
+        <ol className="mt-4 space-y-2 text-sm text-ink/70">
           {[
-            "Copie le lien ci-dessus (avec ta vraie clé).",
-            "iPhone → Réglages → Applications → Calendrier → Comptes.",
-            "Ajouter un compte → Autre → Ajouter un calendrier avec abonnement.",
-            "Colle le lien, valide.",
-            "Tes RDV FD7.CUT apparaissent maintenant dans l’app Calendrier 🎉",
+            "Sur iPhone, ouvre Calendrier → touche « Calendriers » en bas.",
+            "Crée un calendrier dédié, ex. « FD7 indispo » (conseillé), ou utilise un existant.",
+            "Touche le ⓘ à côté → active « Calendrier public » → « Partager le lien » → Copier.",
+            "Colle le lien ci-dessous et enregistre.",
           ].map((s, i) => (
             <li key={i} className="flex gap-3">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet text-[11px] font-bold text-cream">
-                {i + 1}
-              </span>
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/10 text-[11px] font-bold">{i + 1}</span>
               {s}
             </li>
           ))}
         </ol>
-      </div>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <input
+            className="admin-input flex-1"
+            placeholder="webcal://p00-caldav.icloud.com/published/2/…"
+            value={icloud}
+            onChange={(e) => setIcloud(e.target.value)}
+          />
+          <button
+            onClick={saveIcloud}
+            disabled={!valid || state === "saving" || icloud.trim() === savedIcloud}
+            className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-cream transition hover:bg-violet disabled:opacity-40"
+          >
+            {state === "saving" ? "…" : state === "saved" ? "Enregistré ✓" : "Enregistrer"}
+          </button>
+        </div>
+        {!valid && <p className="mt-2 text-xs text-red-600">Le lien doit commencer par webcal:// ou https://</p>}
+        {state === "error" && <p className="mt-2 text-xs text-red-600">Erreur d’enregistrement.</p>}
+        <p className="mt-3 text-xs text-ink/50">
+          Les événements « journée entière » bloquent toute la journée. Mise à jour toutes les ~5 min.
+          Seuls les créneaux occupés sont utilisés : le contenu de tes événements n’est jamais affiché.
+        </p>
+      </section>
 
-      <div className="mt-6 rounded-2xl border border-violet/30 bg-violet/5 p-5 text-sm text-ink/70">
-        ⚡ Fonctionne uniquement quand le site tourne sur <strong>Firebase</strong>{" "}
-        (les RDV doivent être stockés en ligne). En mode démo, l’agenda reste vide.
-        L’iPhone actualise le calendrier automatiquement (toutes les ~15 min à
-        quelques heures selon les réglages).
-      </div>
+      {/* 2. site -> iPhone */}
+      <section className="rounded-2xl border border-line bg-white/50 p-5">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-violet px-2.5 py-0.5 text-[11px] font-bold text-cream">2</span>
+          <h2 className="font-semibold">Les RDV du site apparaissent dans ton iPhone</h2>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <code className="flex-1 break-all rounded-xl bg-ink/[0.05] px-3 py-2 text-sm">
+            {feed || feedErr || "Chargement…"}
+          </code>
+          <button
+            onClick={copy}
+            disabled={!feed}
+            className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-cream transition hover:bg-violet disabled:opacity-40"
+          >
+            {copied ? "Copié ✓" : "Copier"}
+          </button>
+        </div>
+        <ol className="mt-4 space-y-2 text-sm text-ink/70">
+          {[
+            "Copie le lien ci-dessus (envoie-le toi par message pour l’avoir sur l’iPhone).",
+            "iPhone → Réglages → Apps → Calendrier → Comptes → Ajouter un compte.",
+            "Autre → « Ajouter un calendrier avec abonnement » → colle le lien.",
+            "Les RDV FD7.CUT apparaissent dans Calendrier (⏳ = en attente de validation).",
+          ].map((s, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/10 text-[11px] font-bold">{i + 1}</span>
+              {s}
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-xs text-ink/50">Garde ce lien privé : il donne accès à la liste de tes RDV.</p>
+      </section>
+
+      <style jsx global>{`
+        .admin-input {
+          width: 100%;
+          border-radius: 0.9rem;
+          border: 1px solid rgba(11, 11, 13, 0.15);
+          background: rgba(255, 255, 255, 0.7);
+          padding: 0.75rem 1rem;
+          outline: none;
+        }
+      `}</style>
     </div>
   );
 }

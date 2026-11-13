@@ -17,7 +17,7 @@ import {
 import {
   getAvailability,
   getBlocks,
-  getBookingsForDate,
+  getTakenSlots,
   createBooking,
   DEFAULT_AVAILABILITY,
   DEFAULT_BLOCKS,
@@ -113,9 +113,7 @@ export default function Booking() {
     setStatus("idle");
     setLoadingSlots(true);
     try {
-      const b = await getBookingsForDate(dateKey(d));
-      const occupied = b.flatMap((x) => occupiedSlots(x.slot, x.span ?? 1));
-      setTaken(new Set(occupied));
+      setTaken(new Set(await getTakenSlots(dateKey(d))));
     } catch {
       setTaken(new Set());
     } finally {
@@ -411,6 +409,10 @@ export default function Booking() {
           </button>
           <p className="mt-3 text-center text-xs text-ink/40">
             Pas de paiement en ligne — tu règles sur place.
+          </p>
+          <p className="mt-2 text-center text-[11px] leading-snug text-ink/35">
+            Tes infos servent uniquement à gérer ton rendez-vous avec FD7.CUT. Elles ne sont
+            jamais revendues. Pour les supprimer, contacte-nous sur Instagram.
           </p>
         </form>
       </div>

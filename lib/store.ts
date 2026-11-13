@@ -47,6 +47,7 @@ export const DEFAULT_BLOCKS: Blocks = { offDays: [], offSlots: {} };
 const LS = {
   avail: "fd7_availability",
   blocks: "fd7_blocks",
+  icloud: "fd7_icloud",
   bookings: "fd7_bookings",
   gallery: "fd7_gallery",
 };
@@ -102,6 +103,24 @@ export async function saveBlocks(b: Blocks): Promise<void> {
   lsSet(LS.blocks, b);
 }
 
+/* -------------------- Lien agenda iPhone (privé, admin) -------------------- */
+
+export async function getIcloudUrl(): Promise<string> {
+  if (isFirebaseReady && db) {
+    const snap = await getDoc(doc(db, "private", "icloud"));
+    return (snap.data()?.url as string) ?? "";
+  }
+  return lsGet(LS.icloud, "");
+}
+
+export async function saveIcloudUrl(url: string): Promise<void> {
+  if (isFirebaseReady && db) {
+    await setDoc(doc(db, "private", "icloud"), { url: url.trim() });
+    return;
+  }
+  lsSet(LS.icloud, url.trim());
+}
+
 /* -------------------- Réservations -------------------- */
 
 export async function getBookingsForDate(date: string): Promise<Booking[]> {
@@ -125,10 +144,34 @@ export async function getAllBookings(): Promise<Booking[]> {
   );
 }
 
+/** Créneaux indisponibles d'un jour (réservations + agenda iPhone), sans données clients. */
+export async function getTakenSlots(date: string): Promise<number[]> {
+  if (isFirebaseReady) {
+    const res = await fetch(`/api/slots?date=${date}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("slots_unavailable");
+    return ((await res.json()) as { taken: number[] }).taken;
+  }
+  return lsGet<Booking[]>(LS.bookings, [])
+    .filter((b) => b.date === date)
+    .flatMap((b) => occupiedSlots(b.slot, b.span ?? 1));
+}
+
 export async function createBooking(
   b: Booking,
 ): Promise<{ ok: boolean; reason?: string; id?: string; token?: string }> {
-  // anti double-booking (avec durée : chevauchement de créneaux)
+  if (isFirebaseReady) {
+    try {
+      const res = await fetch("/api/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(b),
+      });
+      return await res.json();
+    } catch {
+      return { ok: false, reason: "Connexion impossible, réessaie." };
+    }
+  }
+  // --- mode démo (localStorage) ---
   const existing = await getBookingsForDate(b.date);
   const wanted = occupiedSlots(b.slot, b.span ?? 1);
   const clash = existing.some((e) => {
@@ -141,10 +184,6 @@ export async function createBooking(
   // statut "pending" : le créneau est bloqué mais le coiffeur doit valider
   const token = b.token ?? crypto.randomUUID().replace(/-/g, "");
   const payload: Booking = { ...b, status: b.status ?? "pending", token, createdAt: Date.now() };
-  if (isFirebaseReady && db) {
-    const ref = await addDoc(collection(db, "bookings"), payload);
-    return { ok: true, id: ref.id, token };
-  }
   const id = crypto.randomUUID();
   const all = lsGet<Booking[]>(LS.bookings, []);
   all.push({ ...payload, id });

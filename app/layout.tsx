@@ -15,7 +15,12 @@ const display = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://fd7cut.com"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ??
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : "http://localhost:3000"),
+  ),
   title: "FD7.CUT — Barber",
   description:
     "Prends ton rendez-vous chez FD7.CUT. Coupe, barbe, finitions. Réservation en ligne, créneaux de 40 min.",
@@ -24,8 +29,8 @@ export const metadata: Metadata = {
     title: "FD7.CUT — Barber",
     description: "Réserve ta coupe en ligne. Coupe · Barbe · Finitions.",
     type: "website",
+    locale: "fr_FR",
   },
-  icons: { icon: "/favicon.ico" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

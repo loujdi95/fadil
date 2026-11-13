@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Disponibilités : lecture publique, écriture admin connecté
+    // Réglages publics (dispos, jours off) : lecture publique, écriture admin
     match /settings/{doc} {
       allow read: if true;
       allow write: if request.auth != null;
@@ -14,19 +14,17 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // Réservations : un client peut CRÉER une résa (formulaire public).
-    // Lecture publique nécessaire pour afficher les créneaux déjà pris
-    // (anti double-booking). ⚠️ Cela expose les données du formulaire.
-    // Pour de la vraie prod : passer par une Cloud Function qui n'expose
-    // que les numéros de créneaux, sans nom ni téléphone.
+    // Réservations : AUCUN accès public.
+    // Les clients réservent via le serveur (/api/book), qui ne renvoie
+    // que les créneaux pris (/api/slots) — jamais nom, tél ou e-mail.
     match /bookings/{doc} {
-      allow create: if
-        request.resource.data.name is string &&
-        request.resource.data.phone is string &&
-        request.resource.data.date is string &&
-        request.resource.data.slot is int;
-      allow read: if true;
-      allow update, delete: if request.auth != null;
+      allow read, update, delete: if request.auth != null;
+      allow create: if false;
+    }
+
+    // Données privées (lien agenda iPhone) : admin uniquement
+    match /private/{doc} {
+      allow read, write: if request.auth != null;
     }
   }
 }
