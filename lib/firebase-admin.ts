@@ -1,6 +1,5 @@
 import { getApps, initializeApp, cert, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
 
 /* Accès serveur privilégié (contourne les règles Firestore).
    Nécessite un compte de service dans FIREBASE_SERVICE_ACCOUNT (JSON). */
@@ -31,8 +30,18 @@ export async function isAdminRequest(req: Request): Promise<boolean> {
   const header = req.headers.get("authorization") ?? "";
   if (!a || !header.startsWith("Bearer ")) return false;
   try {
-    await getAuth(a).verifyIdToken(header.slice(7));
-    return true;
+    // vérifie le jeton via l'API Google (évite firebase-admin/auth, incompatible avec le runtime Vercel)
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: header.slice(7) }),
+      },
+    );
+    if (!res.ok) return false;
+    const data = (await res.json()) as { users?: unknown[] };
+    return Boolean(data.users?.length);
   } catch {
     return false;
   }
